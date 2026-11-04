@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-test('preenche, retoma rascunho, gera PDF e exclui termo',async({page})=>{
+test('preenche, retoma rascunho, gera PDF e exclui termo',async({page},testInfo)=>{
  await page.goto('/');
  await page.getByRole('button',{name:'Novo termo',exact:true}).click();
  await page.getByRole('button',{name:'Continuar',exact:true}).click();
@@ -15,12 +15,16 @@ test('preenche, retoma rascunho, gera PDF e exclui termo',async({page})=>{
  const downloadPromise=page.waitForEvent('download');
  await page.getByRole('button',{name:'Baixar PDF',exact:true}).click();
  const download=await downloadPromise;
+ await download.saveAs(testInfo.outputPath('termo-portabilidade-exemplo.pdf'));
  expect(download.suggestedFilename()).toBe('termo-portabilidade-Empresa-Teste-Ltda.pdf');
  const stream=await download.createReadStream();const chunks=[];for await(const chunk of stream) chunks.push(chunk);
  const pdf=Buffer.concat(chunks).toString('latin1');expect(pdf.startsWith('%PDF-')).toBeTruthy();expect(pdf).toContain('Maria da Silva');expect(pdf).toContain('ASSINATURA');
  await page.getByRole('button',{name:'Voltar para meus termos'}).click();
  await expect(page.getByText('Concluído',{exact:true})).toBeVisible();
  await page.reload();await expect(page.getByText('Empresa Teste Ltda',{exact:true})).toBeVisible();
+ const secondDownload=page.waitForEvent('download');
+ await page.getByRole('button',{name:'Baixar PDF de Empresa Teste Ltda'}).click();
+ expect((await secondDownload).suggestedFilename()).toBe('termo-portabilidade-Empresa-Teste-Ltda.pdf');
  await page.getByRole('button',{name:'Excluir termo de Empresa Teste Ltda'}).click();
  await page.getByRole('button',{name:'Excluir termo',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Seu primeiro termo começa aqui'})).toBeVisible();

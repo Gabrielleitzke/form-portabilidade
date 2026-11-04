@@ -1,31 +1,151 @@
-import React,{useState,useEffect,useRef} from 'react';
-import {createRoot} from 'react-dom/client';
-import {ArrowUpRight,ArrowRight,ArrowLeft,Plus,FileText,Clock,Check,Download,Trash2,Search,ShieldCheck,Phone,Layers,X,PenLine,ChevronRight,FolderOpen} from 'lucide-react';
-import {fresh,fields,validate,phoneList,declaration} from './model';
+import React, { useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { ArrowLeft, ArrowRight, Check, Download, FileText, LoaderCircle, Plus, Trash2, X } from 'lucide-react';
+import { digits, fields, fresh, phoneList, validate, declaration } from './model';
+import { lookupCep } from './cep';
 import './style.css';
-const KEY='porta-forms-v1';
-function App(){
- const [records,setRecords]=useState(()=>{try{const v=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(v)?v.filter(d=>d&&typeof d.id==='string'&&typeof d.name==='string'&&['single','range','list'].includes(d.mode)).map(d=>({...fresh(),...d})):[];}catch{return [];}});
- const [active,setActive]=useState(null),[query,setQuery]=useState(''),[filter,setFilter]=useState('all'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[remove,setRemove]=useState(null),[storageError,setStorageError]=useState(false),[busy,setBusy]=useState(false);
- const input=useRef(null);const d=records.find(r=>r.id===active);const step=d?.step||0;const formFields=fields(d);const f=formFields[step];
- useEffect(()=>{try{localStorage.setItem(KEY,JSON.stringify(records));setStorageError(false);}catch{setStorageError(true);}},[records]);
- useEffect(()=>{setError('');input.current?.focus();},[active,step]);
- useEffect(()=>{if(notice){const timer=setTimeout(()=>setNotice(''),4000);return()=>clearTimeout(timer);}},[notice]);
- const update=patch=>setRecords(rs=>rs.map(r=>r.id===active?{...r,...patch,updated:new Date().toISOString()}:r));
- const start=()=>{const n=fresh();setRecords(rs=>[n,...rs]);setActive(n.id);};
- const go=()=>{const msg=validate(d,f.key);if(msg){setError(msg);return;}update({step:step+1});};
- const generate=async(record=d)=>{for(let i=0;i<formFields.length;i++){const msg=validate(record,formFields[i].key);if(msg){update({step:i});setError(msg);return;}}setBusy(true);try{const {downloadPdf}=await import('./pdf');downloadPdf(record);setRecords(rs=>rs.map(r=>r.id===record.id?{...r,status:'complete'}:r));setNotice('PDF gerado. Pronto para enviar ao cliente.');}catch{setError('Não foi possível gerar o PDF. Tente novamente.');}finally{setBusy(false);}};
- const completed=records.filter(r=>r.status==='complete').length;
- const shown=records.filter(r=>(filter==='all'||(filter==='complete'?r.status==='complete':r.status!=='complete'))&&`${r.name} ${r.document} ${r.carrier}`.toLowerCase().includes(query.toLowerCase()));
- return <div className="app"><aside className="sidebar"><a className="brand" href="./" aria-label="Porta início"><span className="brand-icon"><ArrowUpRight size={23}/></span>porta<span className="brand-dot">.</span></a><div className="workspace-label">SEU ESPAÇO DE TRABALHO</div><button className="nav-item selected" onClick={()=>setActive(null)}><FolderOpen size={19}/> Meus termos <span>{records.length}</span></button><div className="sidebar-bottom"><div className="local-icon"><ShieldCheck size={19}/></div><strong>Seus dados ficam com você</strong><p>Os termos são salvos apenas neste navegador, neste dispositivo.</p><div className="local-badge"><span/> Armazenamento local</div></div><div className="sidebar-footer">Feito para simplificar.</div></aside>
- <div className="shell"><header><div className="breadcrumb">Workspace <ChevronRight size={14}/><span>{d?'Novo termo':'Meus termos'}</span></div><span className="header-note"><span/> Portabilidade sem complicação</span></header><main>
- {storageError&&<div role="alert" className="warning">O navegador não conseguiu salvar os dados. Mantenha esta página aberta e baixe o PDF antes de sair.</div>}
- {!d?<><div className="page-heading"><div><div className="eyebrow">ORGANIZE. PREENCHA. ENVIE.</div><h1>Meus termos<span>.</span></h1><p>Menos papelada. Mais tempo para o que importa.</p></div><button className="primary" onClick={start}><Plus size={18}/> Novo termo</button></div>
- <section className="hero"><div className="hero-content"><span className="pill"><span/> SIMPLES, DO INÍCIO AO FIM</span><h2>A portabilidade começa<br/>com um bom termo.</h2><p>Preencha um dado de cada vez e gere um PDF limpo,<br className="desktop"/> pronto para o seu cliente assinar.</p><button className="hero-button" onClick={start}>Criar um termo <ArrowUpRight size={18}/></button><div className="hero-caption"><ShieldCheck size={14}/> Sem cadastro. Salvo no seu navegador.</div></div><div className="hero-art" aria-hidden="true"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="floating-check"><Check size={25}/></div><div className="paper"><div className="paper-logo"><ArrowUpRight size={17}/> porta.</div><span className="paper-tag">TERMO DE PORTABILIDADE</span><div className="paper-title">Uma nova conexão.<br/>Tudo no lugar.</div><div className="paper-lines"><i/><i/><i/></div><div className="paper-row"><span>DADOS DO CONTRATANTE</span><Check size={12}/></div><div className="paper-lines short"><i/><i/></div><div className="paper-sign">Sua próxima conexão</div><div className="paper-sign-label">PRONTO PARA ASSINAR</div></div><div className="pdf-tag"><FileText size={23}/><div><strong>Seu termo, pronto.</strong><span>PDF organizado e profissional</span></div></div></div></section>
- <div className="stats"><div><span className="stat-icon"><FileText size={21}/></span><div><span>Total de termos</span><strong>{String(records.length).padStart(2,'0')}</strong></div></div><div><span className="stat-icon amber"><PenLine size={21}/></span><div><span>Em preenchimento</span><strong>{String(records.length-completed).padStart(2,'0')}</strong></div></div><div><span className="stat-icon green"><Check size={22}/></span><div><span>Prontos para assinar</span><strong>{String(completed).padStart(2,'0')}</strong></div></div></div>
- <section className="records"><div className="section-top"><div><h2>Seus documentos <span>{records.length}</span></h2><p>Continue de onde parou ou baixe um termo já preenchido.</p></div><label className="search"><Search size={17}/><input aria-label="Buscar termos" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar por nome ou documento"/></label></div><div className="tabs">{[['all','Todos os termos'],['draft','Em preenchimento'],['complete','Concluídos']].map(([key,label])=><button className={filter===key?'active':''} key={key} onClick={()=>setFilter(key)}>{label}</button>)}</div>
- {shown.length?<div className="table-wrap"><table><thead><tr><th>CONTRATANTE</th><th>STATUS</th><th>ÚLTIMA ATUALIZAÇÃO</th><th>AÇÕES</th></tr></thead><tbody>{shown.map(r=><tr key={r.id}><td><div className="record-name"><span className="doc-icon"><FileText size={19}/></span><div><strong>{r.name||'Termo sem nome'}</strong><small>{r.document||'Documento ainda não informado'}</small></div></div></td><td><span className={'status '+(r.status==='complete'?'done':'')}>{r.status==='complete'?<Check size={12}/>:<Clock size={12}/>} {r.status==='complete'?'Concluído':'Em preenchimento'}</span></td><td className="date-cell">{new Date(r.updated).toLocaleDateString('pt-BR')}</td><td><div className="row-actions"><button title={r.status==='complete'?'Revisar termo':'Continuar preenchimento'} onClick={()=>{setActive(r.id);}}>{r.status==='complete'?'Revisar':'Continuar'} <ArrowRight size={14}/></button>{r.status==='complete'&&<button aria-label={'Baixar PDF de '+r.name} onClick={()=>generate(r)}><Download size={17}/></button>}<button className="delete" aria-label={'Excluir termo de '+(r.name||'sem nome')} onClick={()=>setRemove(r.id)}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table></div>:<div className="empty"><span className="empty-icon"><FileText size={26}/><span><Plus size={12}/></span></span><h3>{query||filter!=='all'?'Nenhum termo encontrado':'Seu primeiro termo começa aqui'}</h3><p>{query||filter!=='all'?'Tente outra busca ou selecione uma categoria diferente.':'Crie um termo de portabilidade em poucos passos.'}<br/>{!query&&filter==='all'&&'Nós cuidamos da organização para você.'}</p>{!query&&filter==='all'&&<button className="text-button" onClick={start}>Criar meu primeiro termo <ArrowRight size={15}/></button>}</div>}</section><div className="bottom-note"><ShieldCheck size={14}/> Seus documentos ficam neste navegador. Limpar os dados de navegação remove os termos salvos.</div></>:
- <><button className="back-link" onClick={()=>setActive(null)}><ArrowLeft size={16}/> Voltar para meus termos</button><div className="wizard-heading"><div className="eyebrow">NOVO TERMO DE PORTABILIDADE</div><h1>{step===10?'Tudo pronto para revisar.':'Um passo mais perto.'}</h1><p>{step===10?'Confira os dados antes de gerar o documento para assinatura.':'Preencha com calma. Seu progresso é salvo automaticamente.'}</p></div><div className="wizard-layout"><aside className="steps-panel">{['Contratante','Endereço','Portabilidade','Assinatura','Revisão'].map((label,i)=>{const bounds=[0,3,6,8,10];const current=step>=bounds[i]&&(i===4||step<bounds[i+1]);return <div className={'step-group '+(current?'current':'')} key={label}><span>{step>(bounds[i+1]??10)?<Check size={15}/>:i+1}</span><div><strong>{label}</strong><small>{['Identificação do titular','Localização do contratante','Operadora e números','Responsável e data','Conferir e gerar PDF'][i]}</small></div></div>;})}<div className="save-note"><ShieldCheck size={17}/><span>{storageError?'Salvamento indisponível':'Salvo neste navegador'}</span></div></aside><section className="form-card">{step<10?<form onSubmit={e=>{e.preventDefault();go();}}><div className="form-progress"><span>{f.section}</span><span>{step+1} de 10</span></div><div className="progress-track"><span style={{width:`${(step+1)*10}%`}}/></div><h2>{f.label}</h2><p className="field-hint">{f.hint}</p>{f.key==='lines'?<><div className="mode-options">{[['single','Acesso único',Phone],['range','Faixa DDR',Layers],['list','Vários números',FileText]].map(([mode,label,Icon])=><button key={mode} type="button" className={d.mode===mode?'chosen':''} onClick={()=>{update({mode});setError('');}}><Icon size={18}/>{label}</button>)}</div>{d.mode==='range'?<div className="range-fields">{[['first','Número inicial'],['last','Número final']].map(([key,label])=><label key={key}>{label}<input aria-label={label} maxLength={20} inputMode="tel" value={d[key]} onChange={e=>update({[key]:e.target.value})} placeholder="(11) 3000-0000"/></label>)}</div>:d.mode==='list'?<label>Números com DDD<textarea ref={input} aria-label="Números com DDD" maxLength={10000} value={d.numbers} onChange={e=>update({numbers:e.target.value})} placeholder={'1130000000\n1130000001\n1130000002'}/><small>Separe os números por linha, vírgula ou ponto e vírgula.</small></label>:<label>Número com DDD<input ref={input} aria-label="Número com DDD" maxLength={20} inputMode="tel" value={d.phone} onChange={e=>update({phone:e.target.value})} placeholder="(11) 3000-0000"/></label>}</>:<label>{({name:'Razão social ou nome completo',document:'CPF / CNPJ',rg:'RG',address:'Endereço completo',cep:'CEP',city:'Cidade / UF',carrier:'Operadora doadora',signer:'Nome completo',date:'Data do termo'})[f.key]}<input key={f.key} ref={input} aria-invalid={!!error} aria-describedby={error?'field-error':undefined} type={f.type||'text'} inputMode={['document','cep'].includes(f.key)?'numeric':undefined} maxLength={f.key==='address'?350:150} value={d[f.key]} onChange={e=>{update({[f.key]:e.target.value});setError('');}} placeholder={f.placeholder}/></label>}{error&&<p id="field-error" role="alert" className="error">{error}</p>}<div className="form-footer"><button type="button" className="secondary" onClick={()=>step?update({step:step-1}):setActive(null)}><ArrowLeft size={16}/> {step?'Anterior':'Salvar e sair'}</button><button className="primary" type="submit">{step===9?'Revisar termo':'Continuar'} <ArrowRight size={17}/></button></div></form>:<><div className="review-top"><span className="pill light"><Check size={13}/> REVISÃO FINAL</span><FileText size={23}/></div><h2>Termo de aceite</h2><p className="field-hint">Solicitação de portabilidade</p>{[['Dados do contratante',[['Razão social / Nome completo',d.name],['CPF / CNPJ',d.document],['RG',d.rg]],0],['Endereço',[['Endereço completo',d.address],['CEP',d.cep],['Cidade / UF',d.city]],3],['Portabilidade',[['Operadora doadora',d.carrier],['Tipo',d.mode==='single'?'Acesso único':d.mode==='range'?'Sequencial (DDR / Ramal)':'Números não sequenciais'],['Números com DDD',phoneList(d).join(', ')]],6],['Responsável pela assinatura',[['Nome completo',d.signer],['Data',d.date.split('-').reverse().join('/')]],8]].map(([title,items,index])=><div className="review-section" key={title}><div><h3>{title}</h3><button className="text-button" onClick={()=>update({step:index,status:'draft'})}><PenLine size={13}/> Editar</button></div><dl>{items.map(([label,value])=><React.Fragment key={label}><dt>{label}</dt><dd>{value||'Não informado'}</dd></React.Fragment>)}</dl></div>)}<div className="declaration">{declaration}</div><p className="signature-note"><PenLine size={16}/> O PDF terá um espaço em branco para a assinatura do cliente.</p>{error&&<p className="error" role="alert">{error}</p>}<div className="form-footer"><button className="secondary" onClick={()=>update({step:9})}><ArrowLeft size={16}/> Anterior</button><button className="primary" onClick={()=>generate()} disabled={busy}><Download size={17}/>{busy?'Gerando…':'Baixar PDF'}</button></div></>}</section></div></>}
- </main><footer><span className="footer-brand">porta.</span><span>Uma nova conexão começa aqui.</span><span>Termos de portabilidade</span></footer></div>{notice&&<div className="toast" role="status"><Check size={18}/>{notice}<button aria-label="Fechar aviso" onClick={()=>setNotice('')}><X size={15}/></button></div>}{remove&&<div className="modal-backdrop"><div role="dialog" aria-modal="true" aria-labelledby="delete-title" className="modal"><span className="delete-modal-icon"><Trash2 size={24}/></span><h2 id="delete-title">Excluir este termo?</h2><p>Os dados deste termo serão removidos deste navegador. Essa ação não pode ser desfeita.</p><div><button className="secondary" onClick={()=>setRemove(null)}>Cancelar</button><button className="danger" onClick={()=>{setRecords(rs=>rs.filter(r=>r.id!==remove));setRemove(null);setNotice('Termo excluído.');}}>Excluir termo</button></div></div></div>}</div>;
+
+const STORAGE_KEY = 'porta-forms-v1';
+function readRecords() {
+ try {
+  const records = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  if (!Array.isArray(records)) return [];
+  return records.filter(d => d && typeof d.id === 'string' && typeof d.name === 'string' && ['single', 'range', 'list'].includes(d.mode)).map(d => ({
+   ...fresh(), ...d,
+   step: d.flowVersion === 2 ? Math.min(10, Math.max(0, Number(d.step) || 0)) : ({3:4,4:3}[d.step] ?? Math.min(10,Math.max(0,Number(d.step)||0))),
+   flowVersion: 2,
+  }));
+ } catch { return []; }
+}
+
+function App() {
+ const [records, setRecords] = useState(readRecords);
+ const [active, setActive] = useState(null);
+ const [showHistory, setShowHistory] = useState(false);
+ const [error, setError] = useState('');
+ const [notice, setNotice] = useState('');
+ const [storageError, setStorageError] = useState(false);
+ const [busy, setBusy] = useState(false);
+ const [remove, setRemove] = useState(null);
+ const [query, setQuery] = useState('');
+ const [cepState, setCepState] = useState({status:'idle'});
+ const input = useRef(null);
+ const current = records.find(r => r.id === active);
+ const d = current || null;
+ const step = d?.step ?? 0;
+ const formFields = fields(d);
+ const f = formFields[step];
+
+ // Start directly with the latest draft; never create a blank record on every reload.
+ useEffect(() => {
+  const latest = records.find(r => r.status !== 'complete');
+  if (latest) setActive(latest.id);
+  else { const record = fresh(); setRecords(rs => [record,...rs]); setActive(record.id); }
+ }, []);
+ useEffect(() => {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); setStorageError(false); }
+  catch { setStorageError(true); }
+ }, [records]);
+ useEffect(() => { input.current?.focus(); }, [active,step,showHistory]);
+ useEffect(() => {
+  if (!notice) return;
+  const timeout = setTimeout(() => setNotice(''),5000);
+  return () => clearTimeout(timeout);
+ }, [notice]);
+
+ const update = patch => {
+  if (patch.step !== undefined) setError('');
+  setRecords(rs => rs.map(r => r.id === active ? {...r,...patch,status:patch.status || 'draft',updated:new Date().toISOString()} : r));
+ };
+ const start = () => { setError('');const record = fresh(); setRecords(rs => [record,...rs]); setActive(record.id); setShowHistory(false); };
+ const go = () => { const message = validate(d,f.key); if (message) {setError(message);return;} update({step:step+1}); };
+
+ // Abort on navigation / CEP change and only fill fields that are still empty.
+ useEffect(() => {
+  setCepState({status:'idle'});
+  if (!d || step !== 3 || showHistory || digits(d.cep).length !== 8) return;
+  const cep = digits(d.cep), id = d.id;
+  const controller = new AbortController();
+  let expired = false;
+  let timeout;
+  const debounce = setTimeout(async () => {
+   setCepState({status:'loading'});
+   timeout = setTimeout(() => { expired = true; controller.abort(); setCepState({status:'error',message:'A consulta demorou mais que o esperado. Você pode preencher o endereço manualmente.'}); },8000);
+   try {
+    const result = await lookupCep(cep,controller.signal);
+    if (controller.signal.aborted) return;
+    setRecords(rs => rs.map(r => r.id === id && digits(r.cep) === cep ? {...r,address:r.address || result.address,city:r.city || result.city} : r));
+    setCepState({status:'success',...result});
+   } catch (err) {
+    if (!controller.signal.aborted && !expired) setCepState({status:'error',message:err.message === 'Failed to fetch' ? 'Não foi possível consultar o CEP. Preencha o endereço manualmente.' : err.message});
+   } finally { clearTimeout(timeout); }
+  },400);
+  return () => {clearTimeout(debounce);clearTimeout(timeout);controller.abort();};
+ }, [active,d?.cep,step,showHistory]);
+
+ const generate = async (record=d) => {
+  for (let i=0;i<formFields.length;i++) {
+   const message = validate(record,formFields[i].key);
+   if (message) {setActive(record.id);setShowHistory(false);setRecords(rs => rs.map(r=>r.id===record.id?{...r,step:i}:r));setError(message);return;}
+  }
+  setBusy(true);setError('');
+  try {
+   const {downloadPdf} = await import('./pdf');
+   await downloadPdf(record);
+   setRecords(rs => rs.map(r=>r.id===record.id?{...r,status:'complete',updated:new Date().toISOString()}:r));
+   setNotice('PDF gerado para assinatura.');
+  } catch (err) { console.error('Falha ao gerar PDF:',err);setError(err.message?.includes('muito longo')?err.message:'Não foi possível gerar o PDF. Verifique sua conexão e tente novamente.'); }
+  finally {setBusy(false);}
+ };
+ const recordCount = records.filter(r=>r.name || r.document).length;
+ const shown = records.filter(r => r.name || r.document).filter(r=>`${r.name} ${r.document}`.toLowerCase().includes(query.toLowerCase()));
+ const inputProps = {ref:input,'aria-invalid':!!error,'aria-describedby':error?'field-error':undefined};
+
+ return <div className="app">
+  <header><span className="app-title"><FileText size={19}/> Termo de portabilidade</span><button className="quiet" onClick={()=>{setError('');if(showHistory&&!d)start();else setShowHistory(v=>!v);}}>{showHistory?'Voltar ao formulário':`Termos salvos${recordCount?` (${recordCount})`:''}`}</button></header>
+  <main>
+   {storageError && <p className="warning" role="alert">Não foi possível salvar neste navegador. Baixe o PDF antes de fechar a página.</p>}
+   {showHistory ? <section className="card history">
+    <div className="section-heading"><h1>Termos salvos</h1><button className="primary" onClick={start}><Plus size={16}/> Novo termo</button></div>
+    <input aria-label="Buscar termos" placeholder="Buscar por nome ou documento" value={query} onChange={e=>setQuery(e.target.value)}/>
+    {shown.length ? <ul className="record-list">{shown.map(r=><li key={r.id}><div><strong>{r.name||'Termo sem nome'}</strong><small>{r.document||'Documento não informado'} · {r.status==='complete'?'Concluído':'Rascunho'}</small></div><div className="record-actions"><button className="quiet" onClick={()=>{setError('');setActive(r.id);setShowHistory(false);}}>{r.status==='complete'?'Revisar':'Continuar'}</button>{r.status==='complete'&&<button className="icon-button" aria-label={`Baixar PDF de ${r.name}`} disabled={busy} onClick={()=>generate(r)}><Download size={17}/></button>}<button className="icon-button delete" aria-label={`Excluir termo de ${r.name||'sem nome'}`} onClick={()=>setRemove(r.id)}><Trash2 size={16}/></button></div></li>)}</ul>:<p className="empty">Nenhum termo salvo encontrado.</p>}
+    {error&&<p className="error" role="alert">{error}</p>}
+    <p className="local-note">Os termos ficam apenas neste navegador e dispositivo.</p>
+   </section> : d && <section className="card">
+    {step < 10 ? <form onSubmit={e=>{e.preventDefault();go();}}>
+     <div className="progress-caption"><span>{f.section}</span><span>{step+1} de {formFields.length}</span></div><div className="progress-track"><span style={{width:`${(step+1)*10}%`}}/></div>
+     <h1>{f.label}</h1><p className="hint">{f.hint}</p>
+     {f.key==='lines'?<>
+      <div className="mode-options">{[['single','Acesso único'],['range','Faixa DDR'],['list','Vários números']].map(([mode,label])=><button key={mode} type="button" aria-pressed={d.mode===mode} className={d.mode===mode?'selected':''} onClick={()=>{update({mode});setError('');}}>{label}</button>)}</div>
+      {d.mode==='range'?<div className="range-fields">{[['first','Número inicial'],['last','Número final']].map(([key,label])=><label key={key}>{label}<input inputMode="tel" maxLength={20} value={d[key]} onChange={e=>update({[key]:e.target.value})} placeholder="(11) 3000-0000"/></label>)}</div>:d.mode==='list'?<label>Números com DDD<textarea {...inputProps} maxLength={10000} value={d.numbers} onChange={e=>update({numbers:e.target.value})} placeholder={'1130000000\n1130000001'}/><small>Um por linha, ou separados por vírgula ou ponto e vírgula.</small></label>:<label>Número com DDD<input {...inputProps} inputMode="tel" maxLength={20} value={d.phone} onChange={e=>update({phone:e.target.value})} placeholder="(11) 3000-0000"/></label>}
+     </>:<label>{({name:'Razão social ou nome completo',document:'CPF / CNPJ',rg:'RG',cep:'CEP',address:'Endereço completo',city:'Cidade / UF',carrier:'Operadora doadora',signer:'Nome completo',date:'Data do termo'})[f.key]}
+      <input key={f.key} {...inputProps} type={f.type||'text'} autoComplete={({name:'organization',cep:'postal-code',address:'street-address',city:'address-level2'})[f.key]||'off'} inputMode={['document','cep'].includes(f.key)?'numeric':undefined} maxLength={f.key==='address'?350:f.key==='cep'?9:150} value={d[f.key]} onChange={e=>{update({[f.key]:e.target.value});setError('');}} placeholder={f.placeholder}/>
+     </label>}
+     {f.key==='cep' && <div className="cep-status" aria-live="polite">
+      {cepState.status==='loading'&&<p><LoaderCircle className="spinner" size={14}/> Consultando CEP…</p>}
+      {cepState.status==='success'&&<><p className="success"><Check size={14}/> {cepState.address?`${cepState.address} — `:''}{cepState.city}</p>{((d.address&&d.address!==cepState.address)||(d.city&&d.city!==cepState.city))&&<button className="quiet" type="button" onClick={()=>update({address:cepState.address,city:cepState.city})}>Usar este endereço</button>}<p>Confira o endereço e acrescente número e complemento na próxima etapa.</p></>}
+      {cepState.status==='error'&&<p>{cepState.message}</p>}
+     </div>}
+     {error&&<p id="field-error" className="error" role="alert">{error}</p>}
+     <div className="form-footer"><button type="button" className="secondary" onClick={()=>step?update({step:step-1}):setShowHistory(true)}><ArrowLeft size={15}/>{step?'Anterior':'Termos salvos'}</button><button type="submit" className="primary">{step===9?'Revisar termo':'Continuar'}<ArrowRight size={15}/></button></div>
+    </form> : <>
+     <div className="section-heading"><h1>Revisar termo</h1><span className="step-label">10 de 10</span></div>
+     {[
+      ['Contratante',[['Razão social / Nome completo',d.name],['CPF / CNPJ',d.document],['RG',d.rg]],0],
+      ['Endereço',[['CEP',d.cep],['Endereço completo',d.address],['Cidade / UF',d.city]],3],
+      ['Portabilidade',[['Operadora doadora',d.carrier],['Tipo',d.mode==='single'?'Acesso único':d.mode==='range'?'Sequencial (DDR / Ramal)':'Números não sequenciais'],['Números com DDD',phoneList(d).join(', ')]],6],
+      ['Assinatura',[['Nome completo',d.signer],['Data',d.date.split('-').reverse().join('/')]],8],
+     ].map(([title,items,index])=><div className="review-section" key={title}><div className="section-heading"><h2>{title}</h2><button className="quiet" onClick={()=>update({step:index})}>Editar</button></div><dl>{items.map(([label,value])=><React.Fragment key={label}><dt>{label}</dt><dd>{value||'Não informado'}</dd></React.Fragment>)}</dl></div>)}
+     <p className="declaration">{declaration}</p><p className="hint">O PDF mantém o modelo do termo, com espaço para assinatura do cliente.</p>
+     {error&&<p className="error" role="alert">{error}</p>}
+     <div className="form-footer"><button className="secondary" onClick={()=>update({step:9})}><ArrowLeft size={15}/>Anterior</button><button className="primary" onClick={()=>generate()} disabled={busy}>{busy?<LoaderCircle className="spinner" size={16}/>:<Download size={16}/>} {busy?'Gerando…':'Baixar PDF'}</button></div>
+     {d.status==='complete'&&<button className="new-term quiet" onClick={start}><Plus size={15}/>Preencher outro termo</button>}
+    </>}
+   </section>}
+   {!showHistory&&<p className="local-note">{storageError?'Salvamento indisponível.':'Progresso salvo automaticamente neste navegador.'}</p>}
+  </main>
+  {notice&&<div className="toast" role="status"><Check size={17}/>{notice}<button className="icon-button" aria-label="Fechar aviso" onClick={()=>setNotice('')}><X size={15}/></button></div>}
+  {remove&&<div className="modal-backdrop"><div className="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title"><h2 id="delete-title">Excluir este termo?</h2><p>Os dados serão removidos deste navegador. Essa ação não pode ser desfeita.</p><div className="form-footer"><button autoFocus className="secondary" onClick={()=>setRemove(null)}>Cancelar</button><button className="danger" onClick={()=>{setRecords(rs=>rs.filter(r=>r.id!==remove));if(active===remove)setActive(null);setRemove(null);setNotice('Termo excluído.');}}>Excluir termo</button></div></div></div>}
+ </div>;
 }
 createRoot(document.getElementById('root')).render(<App/>);

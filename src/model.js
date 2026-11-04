@@ -1,13 +1,13 @@
 export const declaration = 'ATESTO POSSUIR A AUTONOMIA NECESSÁRIA PARA A REALIZAÇÃO DA PORTABILIDADE DESCRITA NESTE TERMO';
-export const fresh = () => ({id:globalThis.crypto?.randomUUID?.() ?? `term-${Date.now()}-${Math.random().toString(36).slice(2)}`,name:'',document:'',rg:'',address:'',cep:'',city:'',carrier:'',mode:'single',phone:'',first:'',last:'',numbers:'',signer:'',date:new Date().toLocaleDateString('sv-SE'),step:0,status:'draft',updated:new Date().toISOString()});
+export const fresh = () => ({id:globalThis.crypto?.randomUUID?.() ?? `term-${Date.now()}-${Math.random().toString(36).slice(2)}`,name:'',document:'',rg:'',address:'',cep:'',city:'',carrier:'',mode:'single',phone:'',first:'',last:'',numbers:'',signer:'',date:new Date().toLocaleDateString('sv-SE'),step:0,status:'draft',flowVersion:2,updated:new Date().toISOString()});
 export const digits = value => value.replace(/\D/g,'');
 export const phoneList = d => d.mode === 'single' ? [d.phone] : d.mode === 'range' ? [d.first+' até '+d.last] : d.numbers.split(/[\n;,]+/).map(x=>x.trim()).filter(Boolean);
 export const fields = d => [
  {key:'name',label:'Quem é o contratante?',hint:'Informe a razão social da empresa ou o nome completo da pessoa física.',placeholder:'Ex.: Acme Soluções Ltda.',section:'Contratante'},
  {key:'document',label:'Qual é o CPF ou CNPJ?',hint:'Use o documento do titular das linhas na operadora atual.',placeholder:'CPF ou CNPJ',section:'Contratante'},
  {key:'rg',label:'Qual é o RG?',hint:'Informe o RG do titular ou do representante da empresa.',placeholder:'Número do RG',section:'Contratante'},
- {key:'address',label:'Qual é o endereço completo?',hint:'Inclua rua, número, complemento e bairro.',placeholder:'Ex.: Rua das Flores, 120, sala 4, Centro',section:'Endereço'},
- {key:'cep',label:'Qual é o CEP?',hint:'Informe o CEP do endereço do contratante.',placeholder:'00000-000',section:'Endereço'},
+ {key:'cep',label:'Qual é o CEP?',hint:'O endereço será consultado automaticamente. Você poderá revisar os dados.',placeholder:'00000-000',section:'Endereço'},
+ {key:'address',label:'Qual é o endereço completo?',hint:'Confira a rua e o bairro e acrescente o número e o complemento.',placeholder:'Rua, número, complemento e bairro',section:'Endereço'},
  {key:'city',label:'Em qual cidade?',hint:'Informe a cidade e a UF do endereço.',placeholder:'Ex.: São Paulo / SP',section:'Endereço'},
  {key:'carrier',label:'Qual é a operadora atual?',hint:'É a operadora doadora, de onde os números serão transferidos.',placeholder:'Ex.: Vivo, Claro, Oi…',section:'Portabilidade'},
  {key:'lines',label:'Quais números serão portados?',hint:'Informe os números com DDD. Escolha o formato que se aplica às linhas.',section:'Portabilidade'},

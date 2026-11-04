@@ -36,7 +36,9 @@ Os registros ficam apenas no localStorage do navegador/dispositivo. Limpar os da
 
 ## Vercel
 
-Importe o repositório, usando preset **Vite**, build `npm run build` e saída `dist`. Não requer banco de dados, chave de API nem variáveis de ambiente.
+A configuração está versionada em `vercel.json`: preset **Vite**, instalação `npm ci`, build `npm run build` e saída `dist`. O `package.json` fixa Node.js **24.x**. A `.vercelignore` exclui arquivos locais, testes e documentos de referência do upload via CLI. Não requer banco de dados, chave de API nem variáveis de ambiente.
+
+Para conectar à sua conta: importe `Gabrielleitzke/form-portabilidade` em https://vercel.com/new, mantenha a raiz do repositório (`./`) e clique em Deploy. A integração com GitHub permitirá novos deploys a partir dos pushes. Pela CLI autenticada, use `vercel link --repo` e `vercel deploy` para preview. Deploy de produção deve ser solicitado explicitamente.
 
 ## Verificação
 

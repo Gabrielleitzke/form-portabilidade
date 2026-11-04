@@ -1,0 +1,15 @@
+.git
+.agents
+.codex
+.aws
+.env
+.env.*
+node_modules
+dist
+tests
+test-results
+playwright-report
+playwright.config.js
+scripts
+*.doc
+README.md

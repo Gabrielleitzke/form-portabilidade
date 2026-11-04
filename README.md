@@ -1,5 +1,7 @@
 # Porta · Termos de portabilidade
 
+Repositório `form-portabilidade`: formulário de portabilidade VoIP.
+
 Aplicação React + Vite para preencher o modelo `TERMO DE PORTABILIDADE.doc`, um campo por vez, revisar e baixar um PDF com espaço para assinatura.
 
 ## Desenvolvimento

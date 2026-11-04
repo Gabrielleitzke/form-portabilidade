@@ -121,7 +121,6 @@ export async function createPdf(d) {
  const pages=pdf.getPages();
  pages.forEach((p,index)=>{
   line(p,margin,806,margin+width);
-  text(p,'Assine o PDF original e preserve a versão assinada.',margin,813,width-65,11,{size:7,ink:palette.muted});
   text(p,`${index+1} / ${pages.length}`,margin+width-55,813,55,11,{size:7,ink:palette.muted,align:'center'});
  });
  pdf.setTitle('Termo de aceite - Solicitação de portabilidade');

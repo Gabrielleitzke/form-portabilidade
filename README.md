@@ -47,3 +47,9 @@ npm test
 ```
 
 Os testes cobrem preenchimento, número obrigatório, CPF/CNPJ numérico e alfanumérico, RG/CIN, consulta de CEP (respostas controladas), falhas/respostas tardias, migração de rascunhos, responsividade, faixa DDR, anexo de números e download/orientação de assinatura na revisão e no histórico. O servidor de testes é encerrado automaticamente.
+
+### Verificação mobile
+
+`tests/mobile.spec.js` percorre todas as etapas, RG/CIN, modalidades de linhas, revisão, histórico, exclusão e orientação de assinatura nas larguras de 320, 390 e 430 pixels, com toque simulado no Chromium. Verifica ausência de rolagem horizontal, visibilidade dos controles, alvos de toque com pelo menos 44 pixels de altura e download do PDF. Capturas ficam nos resultados locais do Playwright. Essa simulação não substitui testes em aparelhos físicos ou no Safari.
+
+No mobile, os campos usam texto de 16 pixels, os controles têm maior área de toque e o histórico organiza as ações abaixo do nome. O diálogo de assinatura permite rolagem interna e bloqueia a página ao fundo. O PDF mantém somente a paginação no rodapé, sem a frase de orientação final; as instruções de assinatura continuam na interface após o download.

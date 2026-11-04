@@ -46,7 +46,12 @@ function App() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); setStorageError(false); }
   catch { setStorageError(true); }
  }, [records]);
- useEffect(() => { input.current?.focus(); }, [active,step,showHistory]);
+ useEffect(() => {
+  input.current?.focus();
+  if (fields()[step]?.key === 'signer') {
+   setRecords(rs => rs.map(r => r.id === active && !r.signer?.trim() && r.name ? {...r,signer:r.name} : r));
+  }
+ }, [active,step,showHistory]);
  useEffect(() => {
   if (!notice) return;
   const timeout = setTimeout(() => setNotice(''),5000);
@@ -55,7 +60,14 @@ function App() {
 
  const update = patch => {
   if (patch.step !== undefined) setError('');
-  setRecords(rs => rs.map(r => r.id === active ? {...r,...patch,status:patch.status || 'draft',updated:new Date().toISOString()} : r));
+  setRecords(rs => rs.map(r => {
+   if (r.id !== active) return r;
+   const next = {...r,...patch,status:patch.status || 'draft',updated:new Date().toISOString()};
+   // Follow the holder until the signer is explicitly changed to another name.
+   if (patch.name !== undefined && (!r.signer?.trim() || r.signer === r.name)) next.signer = patch.name;
+   if (fields()[patch.step]?.key === 'signer' && !next.signer?.trim()) next.signer = next.name;
+   return next;
+  }));
  };
  const start = () => { setError('');const record = fresh(); setRecords(rs => [record,...rs]); setActive(record.id); setShowHistory(false); };
  const go = () => { const message = validate(d,f.key); if (message) {setError(message);return;} update({step:step+1}); };

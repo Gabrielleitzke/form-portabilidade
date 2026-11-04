@@ -17,7 +17,7 @@ async function finish(page) {
 test('consulta CEP, retoma rascunho e baixa PDF nos dois botões',async({page},testInfo)=>{
  await page.route('https://viacep.com.br/ws/*/json/',route=>route.fulfill({json:sampleCep}));
  await page.goto('/');
- await expect(page.getByRole('heading',{name:'Quem é o contratante?'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:/Quem é o (contratante|titular)/})).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('formulario.png'),fullPage:true});
  await continueStep(page);await expect(page.getByRole('alert')).toContainText('Preencha');
  await identity(page);
@@ -45,7 +45,7 @@ test('consulta CEP, retoma rascunho e baixa PDF nos dois botões',async({page},t
  await page.getByRole('button',{name:'Excluir termo de Empresa Teste Ltda'}).click();await page.getByRole('button',{name:'Excluir termo',exact:true}).click();
  await expect(page.getByText('Nenhum termo salvo encontrado.')).toBeVisible();
  await page.getByRole('button',{name:'Voltar ao formulário'}).click();
- await expect(page.getByRole('heading',{name:'Quem é o contratante?'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:/Quem é o (contratante|titular)/})).toBeVisible();
 });
 test('falha de CEP permite preencher manualmente; responsivo e faixa DDR',async({page})=>{
  await page.route('https://viacep.com.br/ws/*/json/',route=>route.fulfill({json:{erro:true}}));
@@ -102,4 +102,20 @@ test('termo antigo não baixa sem confirmar número obrigatório',async({page})=
  await expect(page.getByRole('heading',{name:'Qual é o número do imóvel?'})).toBeVisible();
  await expect(page.getByRole('alert')).toContainText('número do imóvel');
  await expect(page.getByLabel('Número do imóvel',{exact:true})).toHaveValue('');
+});
+test('assinante começa com o titular e preserva nome editado',async({page})=>{
+ const record={id:'signer-default',flowVersion:3,name:'Titular Original',document:'12345678000195',rgType:'rg',rgUf:'SP',rg:'12.345.678-2',address:'Rua Teste, Centro',number:'42',complement:'',cep:'01001000',city:'São Paulo / SP',carrier:'Vivo',mode:'single',phone:'1130000000',first:'',last:'',numbers:'',signer:'',date:'2026-11-04',step:9,status:'draft'};
+ await page.addInitScript(record=>localStorage.setItem('porta-forms-v1',JSON.stringify([record])),record);
+ await page.goto('/');
+ const signer=page.getByLabel('Nome completo',{exact:true});await expect(signer).toHaveValue('Titular Original');
+ await signer.clear();await continueStep(page);await expect(page.getByRole('alert')).toContainText('Preencha');
+ await signer.fill('Representante Autorizado');await continueStep(page);await page.getByRole('button',{name:'Anterior',exact:true}).click();
+ await expect(signer).toHaveValue('Representante Autorizado');
+ await continueStep(page);await page.getByRole('button',{name:'Revisar termo',exact:true}).click();
+ await expect(page.getByText('Representante Autorizado',{exact:true})).toBeVisible();
+ // Change the holder in the form; a manually chosen signer must remain intact.
+ await page.getByRole('button',{name:'Editar',exact:true}).first().click();
+ await page.getByLabel('Razão social ou nome completo').fill('Novo Titular');
+ for(let i=0;i<9;i++)await continueStep(page);
+ await expect(signer).toHaveValue('Representante Autorizado');
 });

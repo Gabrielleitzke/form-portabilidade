@@ -22,5 +22,14 @@
   },
   "engines": {
     "node": "24.x"
+  },
+  "description": "Formulário de portabilidade VoIP com preenchimento guiado, rascunhos locais e geração de PDF.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gabrielleitzke/form-portabilidade.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Gabrielleitzke/form-portabilidade/issues"
   }
 }

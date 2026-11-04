@@ -13,3 +13,5 @@ playwright.config.js
 scripts
 *.doc
 README.md
+docs
+CONTRIBUTING.md

@@ -3,3 +3,14 @@ dist/
 .vercel/
 test-results/
 playwright-report/
+.env
+.env.*
+!.env.example
+.aws/
+.codex/
+.agents/
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ArrowLeft, ArrowRight, Check, Download, FileText, LoaderCircle, Plus, Trash2, X } from 'lucide-react';
-import { digits, fields, fresh, phoneList, validate, declaration } from './model';
+import { digits, fields, fresh, phoneList, validate, declaration, migrateRecord, identityLabel } from './model';
+import {STATES,formatDocument} from './validation';
+import SignatureGuide from './SignatureGuide';
 import { lookupCep } from './cep';
 import './style.css';
 
@@ -10,11 +12,7 @@ function readRecords() {
  try {
   const records = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
   if (!Array.isArray(records)) return [];
-  return records.filter(d => d && typeof d.id === 'string' && typeof d.name === 'string' && ['single', 'range', 'list'].includes(d.mode)).map(d => ({
-   ...fresh(), ...d,
-   step: d.flowVersion === 2 ? Math.min(10, Math.max(0, Number(d.step) || 0)) : ({3:4,4:3}[d.step] ?? Math.min(10,Math.max(0,Number(d.step)||0))),
-   flowVersion: 2,
-  }));
+  return records.filter(d => d && typeof d.id === 'string' && typeof d.name === 'string' && ['single', 'range', 'list'].includes(d.mode)).map(migrateRecord);
  } catch { return []; }
 }
 
@@ -28,6 +26,7 @@ function App() {
  const [busy, setBusy] = useState(false);
  const [remove, setRemove] = useState(null);
  const [query, setQuery] = useState('');
+ const [signatureGuide, setSignatureGuide] = useState(null);
  const [cepState, setCepState] = useState({status:'idle'});
  const input = useRef(null);
  const current = records.find(r => r.id === active);
@@ -35,6 +34,7 @@ function App() {
  const step = d?.step ?? 0;
  const formFields = fields(d);
  const f = formFields[step];
+ const totalSteps = formFields.length;
 
  // Start directly with the latest draft; never create a blank record on every reload.
  useEffect(() => {
@@ -94,6 +94,7 @@ function App() {
    await downloadPdf(record);
    setRecords(rs => rs.map(r=>r.id===record.id?{...r,status:'complete',updated:new Date().toISOString()}:r));
    setNotice('PDF gerado para assinatura.');
+   setSignatureGuide(record.name);
   } catch (err) { console.error('Falha ao gerar PDF:',err);setError(err.message?.includes('muito longo')?err.message:'Não foi possível gerar o PDF. Verifique sua conexão e tente novamente.'); }
   finally {setBusy(false);}
  };
@@ -112,38 +113,44 @@ function App() {
     {error&&<p className="error" role="alert">{error}</p>}
     <p className="local-note">Os termos ficam apenas neste navegador e dispositivo.</p>
    </section> : d && <section className="card">
-    {step < 10 ? <form onSubmit={e=>{e.preventDefault();go();}}>
-     <div className="progress-caption"><span>{f.section}</span><span>{step+1} de {formFields.length}</span></div><div className="progress-track"><span style={{width:`${(step+1)*10}%`}}/></div>
+    {step < totalSteps ? <form onSubmit={e=>{e.preventDefault();go();}}>
+     <div className="progress-caption"><span>{f.section}</span><span>{step+1} de {formFields.length}</span></div><div className="progress-track"><span style={{width:`${(step+1)/totalSteps*100}%`}}/></div>
      <h1>{f.label}</h1><p className="hint">{f.hint}</p>
-     {f.key==='lines'?<>
+     {f.key==='rg'?<>
+      <div className="mode-options">{[['rg','RG'],['cin','CIN (novo documento)']].map(([type,label])=><button type="button" key={type} aria-pressed={d.rgType===type} className={d.rgType===type?'selected':''} onClick={()=>{update({rgType:type});setError('');}}>{label}</button>)}</div>
+      <label>{d.rgType==='cin'?'CPF da CIN':'Número do RG'}<input {...inputProps} value={d.rg} inputMode={d.rgType==='cin'?'numeric':'text'} maxLength={20} placeholder={d.rgType==='cin'?'000.000.000-00':'Copie o número, incluindo letras'} onChange={e=>{update({rg:e.target.value.toUpperCase()});setError('');}}/></label>
+      {d.rgType==='rg'?<><label className="extra-field">UF de emissão<select value={d.rgUf} onChange={e=>{update({rgUf:e.target.value});setError('');}}><option value="">Selecione a UF</option>{STATES.map(uf=><option key={uf} value={uf}>{uf}</option>)}</select></label><p className="field-note">O RG varia por estado. Conferimos o formato e a UF, sem consulta cadastral.</p></>:<p className="field-note">A CIN usa o CPF como número único. Os dígitos verificadores serão conferidos.</p>}
+     </>:f.key==='lines'?<>
       <div className="mode-options">{[['single','Acesso único'],['range','Faixa DDR'],['list','Vários números']].map(([mode,label])=><button key={mode} type="button" aria-pressed={d.mode===mode} className={d.mode===mode?'selected':''} onClick={()=>{update({mode});setError('');}}>{label}</button>)}</div>
       {d.mode==='range'?<div className="range-fields">{[['first','Número inicial'],['last','Número final']].map(([key,label])=><label key={key}>{label}<input inputMode="tel" maxLength={20} value={d[key]} onChange={e=>update({[key]:e.target.value})} placeholder="(11) 3000-0000"/></label>)}</div>:d.mode==='list'?<label>Números com DDD<textarea {...inputProps} maxLength={10000} value={d.numbers} onChange={e=>update({numbers:e.target.value})} placeholder={'1130000000\n1130000001'}/><small>Um por linha, ou separados por vírgula ou ponto e vírgula.</small></label>:<label>Número com DDD<input {...inputProps} inputMode="tel" maxLength={20} value={d.phone} onChange={e=>update({phone:e.target.value})} placeholder="(11) 3000-0000"/></label>}
-     </>:<label>{({name:'Razão social ou nome completo',document:'CPF / CNPJ',rg:'RG',cep:'CEP',address:'Endereço completo',city:'Cidade / UF',carrier:'Operadora doadora',signer:'Nome completo',date:'Data do termo'})[f.key]}
-      <input key={f.key} {...inputProps} type={f.type||'text'} autoComplete={({name:'organization',cep:'postal-code',address:'street-address',city:'address-level2'})[f.key]||'off'} inputMode={['document','cep'].includes(f.key)?'numeric':undefined} maxLength={f.key==='address'?350:f.key==='cep'?9:150} value={d[f.key]} onChange={e=>{update({[f.key]:e.target.value});setError('');}} placeholder={f.placeholder}/>
+     </>:<label>{({name:'Razão social ou nome completo',document:'CPF / CNPJ',rg:'RG',cep:'CEP',address:'Rua e bairro',number:'Número do imóvel',city:'Cidade / UF',carrier:'Operadora doadora',signer:'Nome completo',date:'Data do termo'})[f.key]}
+      <input key={f.key} {...inputProps} type={f.type||'text'} autoComplete={({name:'organization',cep:'postal-code',address:'street-address',city:'address-level2'})[f.key]||'off'} inputMode={f.key==='cep'?'numeric':undefined} autoCapitalize={f.key==='document'?'characters':undefined} maxLength={f.key==='address'?350:f.key==='cep'?9:f.key==='number'?14:f.key==='document'?18:150} value={d[f.key]} onChange={e=>{update({[f.key]:f.key==='document'?e.target.value.toUpperCase():e.target.value});setError('');}} placeholder={f.placeholder}/>
      </label>}
+     {f.key==='number'&&<label className="extra-field">Complemento (opcional)<input aria-label="Complemento (opcional)" value={d.complement} maxLength={100} onChange={e=>update({complement:e.target.value})} placeholder="Sala, apartamento, bloco…"/></label>}
      {f.key==='cep' && <div className="cep-status" aria-live="polite">
       {cepState.status==='loading'&&<p><LoaderCircle className="spinner" size={14}/> Consultando CEP…</p>}
-      {cepState.status==='success'&&<><p className="success"><Check size={14}/> {cepState.address?`${cepState.address} — `:''}{cepState.city}</p>{((d.address&&d.address!==cepState.address)||(d.city&&d.city!==cepState.city))&&<button className="quiet" type="button" onClick={()=>update({address:cepState.address,city:cepState.city})}>Usar este endereço</button>}<p>Confira o endereço e acrescente número e complemento na próxima etapa.</p></>}
+      {cepState.status==='success'&&<><p className="success"><Check size={14}/> {cepState.address?`${cepState.address} — `:''}{cepState.city}</p>{((d.address&&d.address!==cepState.address)||(d.city&&d.city!==cepState.city))&&<button className="quiet" type="button" onClick={()=>update({address:cepState.address,city:cepState.city})}>Usar este endereço</button>}<p>Confira a rua e o bairro na próxima etapa. O número será solicitado em um campo obrigatório.</p></>}
       {cepState.status==='error'&&<p>{cepState.message}</p>}
      </div>}
      {error&&<p id="field-error" className="error" role="alert">{error}</p>}
-     <div className="form-footer"><button type="button" className="secondary" onClick={()=>step?update({step:step-1}):setShowHistory(true)}><ArrowLeft size={15}/>{step?'Anterior':'Termos salvos'}</button><button type="submit" className="primary">{step===9?'Revisar termo':'Continuar'}<ArrowRight size={15}/></button></div>
+     <div className="form-footer"><button type="button" className="secondary" onClick={()=>step?update({step:step-1}):setShowHistory(true)}><ArrowLeft size={15}/>{step?'Anterior':'Termos salvos'}</button><button type="submit" className="primary">{step===totalSteps-1?'Revisar termo':'Continuar'}<ArrowRight size={15}/></button></div>
     </form> : <>
-     <div className="section-heading"><h1>Revisar termo</h1><span className="step-label">10 de 10</span></div>
+     <div className="section-heading"><h1>Revisar termo</h1><span className="step-label">{totalSteps} de {totalSteps}</span></div>
      {[
-      ['Contratante',[['Razão social / Nome completo',d.name],['CPF / CNPJ',d.document],['RG',d.rg]],0],
-      ['Endereço',[['CEP',d.cep],['Endereço completo',d.address],['Cidade / UF',d.city]],3],
-      ['Portabilidade',[['Operadora doadora',d.carrier],['Tipo',d.mode==='single'?'Acesso único':d.mode==='range'?'Sequencial (DDR / Ramal)':'Números não sequenciais'],['Números com DDD',phoneList(d).join(', ')]],6],
-      ['Assinatura',[['Nome completo',d.signer],['Data',d.date.split('-').reverse().join('/')]],8],
+      ['Contratante',[['Razão social / Nome completo',d.name],['CPF / CNPJ',formatDocument(d.document)],['RG / CIN',identityLabel(d)]],0],
+      ['Endereço',[['CEP',d.cep],['Rua e bairro',d.address],['Número',d.number],['Complemento',d.complement||'—'],['Cidade / UF',d.city]],3],
+      ['Portabilidade',[['Operadora doadora',d.carrier],['Tipo',d.mode==='single'?'Acesso único':d.mode==='range'?'Sequencial (DDR / Ramal)':'Números não sequenciais'],['Números com DDD',phoneList(d).join(', ')]],7],
+      ['Assinatura',[['Nome completo',d.signer],['Data',d.date.split('-').reverse().join('/')]],9],
      ].map(([title,items,index])=><div className="review-section" key={title}><div className="section-heading"><h2>{title}</h2><button className="quiet" onClick={()=>update({step:index})}>Editar</button></div><dl>{items.map(([label,value])=><React.Fragment key={label}><dt>{label}</dt><dd>{value||'Não informado'}</dd></React.Fragment>)}</dl></div>)}
-     <p className="declaration">{declaration}</p><p className="hint">O PDF mantém o modelo do termo, com espaço para assinatura do cliente.</p>
+     <p className="declaration">{declaration}</p><p className="hint">O PDF mantém a estrutura do termo e inclui espaço para assinatura eletrônica do responsável.</p>
      {error&&<p className="error" role="alert">{error}</p>}
-     <div className="form-footer"><button className="secondary" onClick={()=>update({step:9})}><ArrowLeft size={15}/>Anterior</button><button className="primary" onClick={()=>generate()} disabled={busy}>{busy?<LoaderCircle className="spinner" size={16}/>:<Download size={16}/>} {busy?'Gerando…':'Baixar PDF'}</button></div>
+     <div className="form-footer"><button className="secondary" onClick={()=>update({step:totalSteps-1})}><ArrowLeft size={15}/>Anterior</button><button className="primary" onClick={()=>generate()} disabled={busy}>{busy?<LoaderCircle className="spinner" size={16}/>:<Download size={16}/>} {busy?'Gerando…':'Baixar PDF'}</button></div>
      {d.status==='complete'&&<button className="new-term quiet" onClick={start}><Plus size={15}/>Preencher outro termo</button>}
     </>}
    </section>}
    {!showHistory&&<p className="local-note">{storageError?'Salvamento indisponível.':'Progresso salvo automaticamente neste navegador.'}</p>}
   </main>
+  {signatureGuide!==null&&<SignatureGuide name={signatureGuide} onClose={()=>setSignatureGuide(null)}/>}
   {notice&&<div className="toast" role="status"><Check size={17}/>{notice}<button className="icon-button" aria-label="Fechar aviso" onClick={()=>setNotice('')}><X size={15}/></button></div>}
   {remove&&<div className="modal-backdrop"><div className="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title"><h2 id="delete-title">Excluir este termo?</h2><p>Os dados serão removidos deste navegador. Essa ação não pode ser desfeita.</p><div className="form-footer"><button autoFocus className="secondary" onClick={()=>setRemove(null)}>Cancelar</button><button className="danger" onClick={()=>{setRecords(rs=>rs.filter(r=>r.id!==remove));if(active===remove)setActive(null);setRemove(null);setNotice('Termo excluído.');}}>Excluir termo</button></div></div></div>}
  </div>;

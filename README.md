@@ -7,26 +7,32 @@ npm install
 npm run dev
 ```
 
-O formulário abre diretamente no último rascunho. O botão **Termos salvos** permite revisar, continuar, baixar e excluir registros. Os rascunhos antigos são preservados, inclusive na mudança da ordem dos campos CEP/endereço.
+O formulário abre diretamente no último rascunho. **Termos salvos** permite revisar, continuar, baixar e excluir registros. Rascunhos antigos são preservados; os campos novos e os documentos são conferidos novamente antes de baixar o PDF.
 
-A consulta do [ViaCEP](https://viacep.com.br/) preenche rua, bairro e cidade após informar oito dígitos de CEP. Número e complemento devem ser conferidos manualmente. Campos já preenchidos são preservados; o usuário pode aplicar explicitamente o endereço encontrado. Consulta abortada ao mudar de CEP/etapa e timeout de oito segundos. Em caso de falha ou CEP inexistente, o preenchimento manual continua disponível.
+## Endereço
 
-Os registros ficam apenas no localStorage do navegador e dispositivo usados. Limpar os dados de navegação remove os registros. Apenas o CEP é enviado ao ViaCEP; os demais dados do formulário não são enviados ao servidor. CPF/CNPJ é validado pelo tamanho, não pelos dígitos verificadores ou titularidade.
+A consulta do [ViaCEP](https://viacep.com.br/) preenche rua, bairro e cidade após informar oito dígitos de CEP. O número é um campo separado e obrigatório, com complemento opcional. Aceita sufixo, como `120A`, e `S/N` quando o imóvel não possui número. Campos já preenchidos são preservados; o usuário pode aplicar explicitamente o endereço encontrado. A consulta é cancelada ao mudar de CEP/etapa, com timeout de oito segundos. Se a consulta falhar ou o CEP não existir, o preenchimento manual continua disponível.
 
-## Modelo do PDF
+## Documentos
 
-`src/assets/termo-original.pdf` foi convertido do `.doc` fornecido. O PDF é preenchido sobre esse modelo com `pdf-lib`, mantendo logo, cores, tabelas, textos e espaços originais. O único ajuste no modelo coloca a legenda **ASSINATURA** sob a respectiva linha, evitando a segunda página que no `.doc` continha apenas essa legenda.
+- **CPF**: formato, repetição e os dois dígitos verificadores.
+- **CNPJ numérico e alfanumérico**: 14 posições, com dois verificadores numéricos. Letras são preservadas e convertidas para maiúsculas. Cálculo por módulo 11, usando o valor ASCII de cada caractere menos 48 e os pesos oficiais, conforme o [Anexo XV da Receita Federal](https://normas.receita.fazenda.gov.br/sijut2consulta/anexoOutros.action?idArquivoBinario=76204). Exemplos de teste: `12.345.678/0001-95` e `12.ABC.345/01DE-35`.
+- **RG**: tipo selecionado, UF de emissão obrigatória, formato, comprimento e caracteres; preserva zeros à esquerda, prefixos e sufixos com letras. Não aplica um único algoritmo de DV a documentos de todos os estados. Não há verificação de existência, titularidade ou consulta cadastral.
+- **CIN**: opção distinta do RG estadual; valida o CPF que identifica a Carteira de Identidade Nacional, conforme as [orientações oficiais da CIN](https://www.gov.br/gestao/pt-br/identidade-nacional).
 
-As três seções de linhas são preservadas; apenas a modalidade escolhida é preenchida. Até 20 números não sequenciais cabem no quadro original. Números adicionais seguem em anexo identificado com contratante e CPF/CNPJ, sem truncamento. O tamanho da fonte se adapta ao conteúdo dos campos.
+Validação matemática não confirma a existência, situação cadastral ou titularidade de CPF/CNPJ. Dados do representante que assina podem ser diferentes dos dados do contratante.
 
-Para recriar o modelo após alterar o arquivo Word:
+## PDF e assinatura
 
-```sh
-libreoffice --headless --convert-to pdf --outdir /tmp 'TERMO DE PORTABILIDADE.doc'
-node scripts/prepare-template.mjs '/tmp/TERMO DE PORTABILIDADE.pdf'
-```
+O PDF A4 mantém as seções, a declaração e o logo do termo original. As tabelas são desenhadas em vetor com `pdf-lib`, usando bordas leves, roxo discreto, células com respiro e texto selecionável. Rua/bairro, número e complemento compõem o endereço completo. RG ou CIN e UF são incluídos na identificação. O modelo antigo permanece em `src/assets/termo-original.pdf` como referência visual; o logo extraído está em `src/assets/logo-original.png`.
 
-A conversão só é necessária ao modificar o modelo; não é executada no servidor ou durante o build.
+As três modalidades de linhas permanecem no documento; apenas a escolhida é preenchida. Até 20 números não sequenciais cabem no quadro principal; os demais seguem em anexos com contratante, CPF/CNPJ e paginação, sem truncamento. A assinatura fica na mesma página da declaração, com espaço para assinatura digital.
+
+Após qualquer download, inclusive pelo histórico, a aplicação exibe instruções para o responsável assinar pelo [Gov.br](https://assinador.iti.br/) (conta prata/ouro, quando aceito pela operadora) ou com certificado ICP-Brasil. Orienta a baixar/preservar o arquivo assinado e conferir a assinatura no [VALIDAR do ITI](https://validar.iti.gov.br/), sem editar nem imprimir para PDF após assinar. A aplicação não assina o documento nem afirma que o simples download lhe confere validade. A orientação segue o [serviço oficial de assinatura eletrônica](https://www.gov.br/governodigital/pt-br/identidade/assinatura-eletronica/assinatura-eletronica/) e observa os requisitos da operadora.
+
+## Armazenamento
+
+Os registros ficam apenas no localStorage do navegador/dispositivo. Limpar os dados de navegação remove os registros. Apenas o CEP é enviado ao ViaCEP; os demais dados não são enviados ao servidor. Links de assinatura são abertos somente por ação do usuário e nenhum arquivo é enviado automaticamente.
 
 ## Vercel
 
@@ -40,4 +46,4 @@ npx playwright install chromium
 npm test
 ```
 
-Os testes cobrem preenchimento, consulta de CEP com respostas controladas, falha de consulta, resposta tardia, migração de rascunho, responsividade, validação de faixa DDR e download do PDF na revisão e no histórico.
+Os testes cobrem preenchimento, número obrigatório, CPF/CNPJ numérico e alfanumérico, RG/CIN, consulta de CEP (respostas controladas), falhas/respostas tardias, migração de rascunhos, responsividade, faixa DDR, anexo de números e download/orientação de assinatura na revisão e no histórico. O servidor de testes é encerrado automaticamente.
